@@ -1,0 +1,145 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: admin-user
+  namespace: kubernetes-dashboard
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: django
+  labels:
+    app: django
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 8000
+    targetPort: 8080
+  selector:
+    app: django
+    tier: app
+
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: django-app-pvc
+  labels:
+    app: django
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: efs-sc
+  resources:
+    requests:
+      storage: 5Gi
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: django
+  labels:
+    app: django
+spec:
+  selector:
+    matchLabels:
+      app: django
+      tier: app
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: django
+        tier: app
+    spec:
+      volumes:
+        - name: django-app-data
+          persistentVolumeClaim:
+            claimName: django-app-pvc
+      containers:
+        - image: 067782045631.dkr.ecr.eu-west-2.amazonaws.com/django-k8s-app:latest # c'est bon
+          name: app
+          ports:
+            - containerPort: 8080
+              name: app
+          volumeMounts:
+            - name: django-app-data
+              mountPath: /vol/web
+          env:
+            - name: DB_HOST
+              value: django-k8s-db.ct6nqhqrpast.eu-west-2.rds.amazonaws.com # c'est bon
+            - name: DB_NAME
+              value: djangoproject
+            - name: DB_USER
+              value: djangouser
+            - name: ALLOWED_HOSTS
+              value: "a1a27ff1e2123445fb7155ba1dadacd6-1241127737.eu-west-3.elb.amazonaws.com"
+            - name: DB_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: db-password
+                  key: password
+            - name: SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: django
+                  key: secret
+
+        - image: 067782045631.dkr.ecr.eu-west-2.amazonaws.com/django-k8s-proxy:latest # C'est bon'
+          name: proxy
+          ports:
+            - containerPort: 8000
+              name: proxy
+          volumeMounts:
+            - name: django-app-data
+              mountPath: /vol/web
+          env:
+            - name: APP_HOST
+              value: "127.0.0.1"
+            - name: APP_PORT
+              value: "8080"
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: service-ingress
+  annotations:
+    kubernetes.io/ingress.class: "alb"
+    alb.ingress.kubernetes.io/scheme: "internet-facing"
+  # Autres annotations spécifiques
+spec:
+  rules:
+  - http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: dajngo
+            port:
+              number: 80
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: efs-sc
+provisioner: efs.csi.aws.com
+parameters:
+  provisioningMode: efs-ap
+  fileSystemId: fs-08a8fb0bd4db8e869 # c'est bon
+  directoryPerms: "755"
+  basePath: "/dynamic_provisioning"
+---
+apiVersion: 'kubernetes-client.io/v1'
+kind: ExternalSecret
+metadata:
+  name: db-secret
+spec:
+  backendType: secretsManager
+  data:
+    - key: db_secret
+      name: password
+      property: password

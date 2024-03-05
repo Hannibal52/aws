@@ -1,0 +1,68 @@
+resource "aws_wafv2_web_acl" "example" {
+  name        = "example-web-acl"
+  description = "Example ACL for ALB"
+  scope       = "REGIONAL"
+
+  default_action {
+    allow {}
+  }
+
+  rule {
+    name     = "rule-1"
+    priority = 1
+
+    action {
+      block {}
+    }
+
+    statement {
+      size_constraint_statement {
+        field_to_match {
+          query_string {}
+        }
+
+        comparison_operator = "GT"
+        size                = 100
+        text_transformation {
+          priority = 0
+          type     = "NONE"
+        }
+      }
+    }
+
+    visibility_config {
+      cloudwatch_metrics_enabled = false
+      metric_name                = "rule1"
+      sampled_requests_enabled   = false
+    }
+  }
+
+  visibility_config {
+    cloudwatch_metrics_enabled = false
+    metric_name                = "example-web-acl"
+    sampled_requests_enabled   = false
+  }
+
+  tags = {
+    Tag1 = "Value1"
+  }
+}
+
+
+
+resource "aws_wafv2_web_acl_association" "example" {
+  resource_arn = aws_lb.example.arn
+  web_acl_arn  = aws_wafv2_web_acl.example.arn
+}
+
+output "alb_arn_output" {
+  value = var.alb_arn 
+  // cette valeur va être récupéré avant le applan dans le script manuel de terraform 
+ // il faut trouver une meilleur solution automatique pour cela
+
+ // car cette valeur peut être récupé après le déploiment de eks et le ALB bofffff
+ 
+}
+
+//ALB_ARN=$(kubectl get ingress service-ingress -o=jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+//terraform apply -var="alb_arn=${ALB_ARN}"

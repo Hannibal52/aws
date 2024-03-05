@@ -1,0 +1,17 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: github-pr-build-
+spec:
+  entrypoint: build-image
+  arguments:
+    parameters:
+      - name: branch
+      - name: commit
+  templates:
+    - name: build-image
+      container:
+        image: gcr.io/kaniko-project/executor:latest
+        args:
+          - "--context=git://github.com/[nom-d-utilisateur-github]/[Repository].git#${inputs.parameters.branch}"
+          - "--destination=aws_account_id.dkr.ecr.region.amazonaws.com/repository:${inputs.parameters.commit}"

@@ -1,0 +1,12 @@
+resources:
+  - django.yaml
+  - storageclass.yaml
+  - secrets.yaml
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: my-serviceaccount
+  namespace: default
+  annotations:
+    eks.amazonaws.com/role-arn: "arn:aws:iam::067782045631:role/secrets_manager_role"

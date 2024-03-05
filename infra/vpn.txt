@@ -1,0 +1,50 @@
+resource "aws_customer_gateway" "main" {
+  bgp_asn    = 65000 # ASN fictif, remplacez par le vôtre si nécessaire
+  ip_address = "92.184.112.50" # Remplacez par l'adresse IP publique de votre dispositif VPN OVH
+  type       = "ipsec.1"
+  tags = {
+    Name = "main-customer-gateway"
+  }
+}
+
+# Création d'une Virtual Private Gateway pour le VPN
+resource "aws_vpn_gateway" "main" {
+  vpc_id = module.vpc.vpc_id # Utilisez l'ID VPC du module VPC
+  tags = {
+    Name = "main-vpn-gateway"
+  }
+}
+
+# Association de la Virtual Private Gateway avec les sous-réseaux
+resource "aws_vpn_gateway_attachment" "main" {
+  vpc_id         = module.vpc.vpc_id
+  vpn_gateway_id = aws_vpn_gateway.main.id
+}
+
+# Création d'une connexion VPN
+resource "aws_vpn_connection" "main" {
+  customer_gateway_id = aws_customer_gateway.main.id
+  vpn_gateway_id      = aws_vpn_gateway.main.id
+  type                = "ipsec.1"
+  static_routes_only  = true # Défini sur false si vous utilisez BGP
+  tunnel1_preshared_key = var.vpn_preshared_key
+  tunnel2_preshared_key = var.vpn_preshared_key
+
+  tags = {
+    Name = "main-vpn-connection"
+  }
+}
+
+# Configuration des routes pour le trafic VPN
+# (Ceci est un exemple, les détails spécifiques dépendront de votre configuration de réseau OVH)
+resource "aws_route" "vpn_route" {
+  route_table_id         = module.vpc.public_route_table_ids[0]
+  destination_cidr_block = "192.168.29.0/24" # Remplacez par le bloc CIDR de votre réseau OVH
+  gateway_id             = aws_vpn_gateway.main.id
+}
+
+
+
+
+
+
